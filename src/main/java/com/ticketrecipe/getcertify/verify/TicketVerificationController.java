@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/v1/certify/tickets") //i.e. api.ticketrecipe.com/certify/tickets/{}/verification
+@RequestMapping("/v1/certify/ticket") //i.e. api.ticketrecipe.com/certify/ticket/verification
 @RequiredArgsConstructor
 public class TicketVerificationController {
 

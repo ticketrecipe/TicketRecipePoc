@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequiredArgsConstructor
-@RequestMapping("/v1/certify/tickets/") //i.e. api.ticketrecipe.com/certify/tickets/validation
+@RequestMapping("/v1/certify/ticket") //i.e. api.ticketrecipe.com/certify/ticket/validation
 @Slf4j
 public class TicketValidationController {
 
