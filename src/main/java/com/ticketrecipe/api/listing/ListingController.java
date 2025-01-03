@@ -15,12 +15,6 @@ public class ListingController {
         this.listingService = listingService;
     }
 
-//    @PostMapping
-//    public ResponseEntity<Listing> createListing(@RequestBody Listing listing) {
-//        Listing savedListing = listingService.saveListing(listing);
-//        return ResponseEntity.ok(savedListing);
-//    }
-
     @GetMapping("/{id}")
     public ResponseEntity<Listing> getListing(@PathVariable String id) {
         return listingService.getListingById(id)
