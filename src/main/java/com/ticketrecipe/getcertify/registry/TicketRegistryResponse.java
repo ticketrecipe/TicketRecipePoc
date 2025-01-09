@@ -1,4 +1,4 @@
-package com.ticketrecipe.getcertify;
+package com.ticketrecipe.getcertify.registry;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,7 +8,6 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 public class TicketRegistryResponse {
-
     private List<TicketQRCode> qrCodes;
 
     @Data

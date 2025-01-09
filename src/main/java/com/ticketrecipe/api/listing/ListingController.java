@@ -8,12 +8,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/listings")
 public class ListingController {
 
-    private final ListingService listingService;
-
     @Autowired
-    public ListingController(ListingService listingService) {
-        this.listingService = listingService;
-    }
+    private  ListingService listingService;
 
     @GetMapping("/{id}")
     public ResponseEntity<Listing> getListing(@PathVariable String id) {

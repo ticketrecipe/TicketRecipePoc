@@ -13,11 +13,17 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SeatInventory {
+public class ListingInventory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
+
+    @ManyToOne
+    @JsonIgnore
+    @JoinColumn(name = "ticket_id", referencedColumnName = "id", nullable = false)
+    private Ticket ticket;
+
     private String seat;
 
     @Column(name = "seatRow")

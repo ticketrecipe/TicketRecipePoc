@@ -5,5 +5,7 @@ public enum TicketStatus {
     GC_VERIFIED,        // Verified by GrabCertify
     INVALID,            // Invalid ticket
     NOT_VERIFIABLE,     // Cannot be verified (but allowed to sell)
-    EXPIRED             // Expired ticket
+    LOCKED,
+    EXPIRED,
+    EXISTING
 }

@@ -1,4 +1,4 @@
-package com.ticketrecipe.tickets.configuraton;
+package com.ticketrecipe.marketplace.configuraton;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

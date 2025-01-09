@@ -1,7 +1,9 @@
 package com.ticketrecipe.getcertify.verify;
 
+import com.ticketrecipe.common.TicketStatus;
 import com.ticketrecipe.getcertify.CertifiedTicket;
-import com.ticketrecipe.getcertify.TicketRegistryRepository;
+import com.ticketrecipe.getcertify.GetCertifyException;
+import com.ticketrecipe.getcertify.registry.TicketRegistryRepository;
 import com.ticketrecipe.common.security.SecurePayloadEncrypter;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -23,34 +25,43 @@ public class TicketVerificationService {
     @Transactional
     public TicketVerificationResult validateTicket(String qrCodeData) {
         try {
+            // Step 1: Validate the QR code URL format
             if (!qrCodeData.startsWith(qrCodeBaseUrl)) {
-                throw new TicketVerificationException("Invalid GetCertify! QR Code URL", "INVALID_GC_QR_CODE");
+                throw new GetCertifyException("Invalid GetCertify! QR Code URL", TicketStatus.INVALID.toString());
             }
 
+            // Step 2: Extract the reference ID and encrypted payload from the QR code
             String qrCodePath = qrCodeData.substring(qrCodeBaseUrl.length());
             String[] qrCodeParts = qrCodePath.split("\\.");
             if (qrCodeParts.length != 2) {
-                throw new TicketVerificationException("Invalid GetCertify! QR Code", "INVALID_GC_QR_CODE");
+                throw new GetCertifyException("Invalid GetCertify! QR Code", TicketStatus.INVALID.toString());
             }
 
             String refId = qrCodeParts[0];
             String encryptedPayload = qrCodeParts[1];
 
-            // Retrieve the ticket by uniqueId
+            // Step 3: Retrieve the ticket by its reference ID
             CertifiedTicket ticket = ticketRegistryRepository.findByReferenceId(refId)
-                    .orElseThrow(() -> new TicketVerificationException("Invalid GetCertify! QR Code", "INVALID_GC_QR_CODE"));
+                    .orElseThrow(() -> new GetCertifyException("Invalid GetCertify! QR Code", TicketStatus.INVALID.toString()));
 
+            log.info("CertifiedTicket : {}", ticket);
+            // Check if the ticket is locked because being put on sale
+            if (ticket.isLocked()) {
+                throw new GetCertifyException("Ticket has been locked for resale.", TicketStatus.LOCKED.toString());
+            }
+
+            // Step 4: Decrypt the payload
             String decryptedPayload = qrCodeDecrypter.decrypt(encryptedPayload, ticket.getAesKey());
 
-            // Parse decrypted payload to extract the barcode and purchaser email
+            // Step 5: Parse the decrypted payload to extract the barcode and purchaser details
             String[] payloadParts = decryptedPayload.split(",");
             String barcodeId = payloadParts[0].split(":")[1];  // Extract barcodeId
             String purchaserEmailAddress = payloadParts[1].split(":")[1]; // Extract emailAddress
-            String purchaserName = payloadParts[2].split(":")[1]; // Extract emailAddress
+            String purchaserName = payloadParts[2].split(":")[1]; // Extract purchaser name
 
-            // Build and return the response with verifiable ticket details
+            // Step 6: Build and return the response with verifiable ticket details
             return new TicketVerificationResult(
-                    refId,
+                    ticket.getId(),
                     purchaserEmailAddress,
                     ticket.getEventId(),
                     ticket.getEventName(),
@@ -59,15 +70,21 @@ public class TicketVerificationService {
                     ticket.getVenue().getName(),
                     ticket.getVenue().getAddress(),
                     purchaserName,
+                    ticket.getCategory(),
+                    ticket.getType(),
                     ticket.getRow(),
                     ticket.getSeat(),
                     ticket.getSection(),
                     ticket.getPrice().getAmount(),
                     ticket.getPrice().getCurrency()
             );
+
+        } catch (GetCertifyException e) {
+            throw e; // Re-throw custom exceptions
         } catch (Exception e) {
-            log.error("GetCertify! QR code failed validation", e.getMessage());
-            throw new TicketVerificationException("Invalid GetCertify! QR Code", "INVALID_GC_QR_CODE");
+            log.error("GetCertify! QR code failed validation: {}", e.getMessage());
+            throw new GetCertifyException("Invalid GetCertify! QR Code", TicketStatus.INVALID.toString());
         }
     }
+
 }

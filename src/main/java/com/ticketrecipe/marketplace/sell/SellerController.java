@@ -1,10 +1,9 @@
-package com.ticketrecipe.tickets.sell;
+package com.ticketrecipe.marketplace.sell;
 
 import com.ticketrecipe.api.listing.Listing;
 import com.ticketrecipe.api.listing.ListingService;
-import com.ticketrecipe.common.Price;
 import com.ticketrecipe.common.Ticket;
-import com.ticketrecipe.common.listing.ConfirmedListing;
+import com.ticketrecipe.common.listing.ConfirmListingDto;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -59,7 +57,6 @@ public class SellerController {
         }
 
         // Retrieve processed tickets from session
-        @SuppressWarnings("unchecked")
         List<Ticket> importedTickets = (List<Ticket>) session.getAttribute(SESSION_TICKETS_KEY);
         if (importedTickets == null || importedTickets.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No imported tickets found in session.");
@@ -91,26 +88,26 @@ public class SellerController {
         }
     }
 
-//    @PostMapping("/confirm-listing")
-//    public ResponseEntity<?> confirmAndPublishListings(@RequestBody ConfirmListingRequest request) {
-//        try {
-//            // Update listings and lock tickets
-//            List<Listing> updatedListings = listingService.confirmListings(request.listings());
-//
-//            log.info("Successfully published {} listings.", updatedListings.size());
-//            return ResponseEntity.ok(updatedListings);
-//
-//        } catch (Exception e) {
-//            log.error("Error confirming and publishing listings: {}", e.getMessage(), e);
-//
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-//                    .body("Error confirming and publishing listings.");
-//        }
-//    }
+    @PostMapping("/confirm-listing")
+    public ResponseEntity<?> confirmAndPublishListings(@RequestBody ConfirmListingRequest request) {
+        try {
+            // Update listings and lock tickets
+            List<Listing> updatedListings = listingService.confirmListings(request.listings());
+
+            log.info("Successfully published {} listings.", updatedListings.size());
+            return ResponseEntity.ok(updatedListings);
+
+        } catch (Exception e) {
+            log.error("Error confirming and publishing listings: {}", e.getMessage(), e);
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error confirming and publishing listings.");
+        }
+    }
 
     // Request DTO for confirm listing(s)
     public record ConfirmListingRequest(
-            List<ConfirmedListing> listings
+            List<ConfirmListingDto> listings
     ) {}
 
     // Response DTO for create-listing(s)

@@ -1,4 +1,4 @@
-package com.ticketrecipe.getcertify;
+package com.ticketrecipe.getcertify.registry;
 
 import com.ticketrecipe.common.Price;
 import lombok.Data;
@@ -34,6 +34,7 @@ public class TicketCertifyRequest {
         private String barcodeId;
         private String entrance;
         private String category;
+        private String type;
         private String row;
         private String seat;
         private String section;

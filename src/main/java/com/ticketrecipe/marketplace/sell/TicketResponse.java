@@ -1,4 +1,4 @@
-package com.ticketrecipe.tickets.sell;
+package com.ticketrecipe.marketplace.sell;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.ticketrecipe.common.Price;

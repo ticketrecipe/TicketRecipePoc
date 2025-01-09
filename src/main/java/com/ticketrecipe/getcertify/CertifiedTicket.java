@@ -1,5 +1,6 @@
 package com.ticketrecipe.getcertify;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,8 +13,11 @@ public class CertifiedTicket {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    @JsonIgnore
     @Column(name = "ref_id", nullable = false, unique = true)
     private String referenceId;
+
+    private boolean locked; // Add a boolean field for lock status
 
     @Column(name = "aes_key", nullable = false, unique = false)
     private String aesKey;

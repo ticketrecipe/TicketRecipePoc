@@ -1,25 +1,10 @@
 package com.ticketrecipe.api.listing;
 
 import com.ticketrecipe.common.Price;
-import com.ticketrecipe.common.SeatInventory;
+import com.ticketrecipe.common.ListingInventory;
 import com.ticketrecipe.common.TicketType;
 import com.ticketrecipe.common.User;
-import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.AttributeOverrides;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Transient;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -37,7 +22,7 @@ public class Listing {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String listingId;
+    private String id;
 
     private String eventId;
 
@@ -54,12 +39,11 @@ public class Listing {
 
     private String section;
 
-    // Fixed: Added @Builder.Default to use default initialization
     @Builder.Default
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<SeatInventory> seats = new ArrayList<>();
+    private List<ListingInventory> inventories = new ArrayList<>();
 
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "seller_id", referencedColumnName = "id")
     private User seller;
 
@@ -85,7 +69,7 @@ public class Listing {
         List<String> consecutiveSeatsList = new ArrayList<>();
 
         // Iterate through the list of seats and add their seat identifiers
-        for (SeatInventory seatInventory : seats) {
+        for (ListingInventory seatInventory : inventories) {
             consecutiveSeatsList.add(seatInventory.getSeat());
         }
         return consecutiveSeatsList;

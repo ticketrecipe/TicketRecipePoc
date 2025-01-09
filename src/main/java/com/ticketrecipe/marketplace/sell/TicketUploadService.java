@@ -1,11 +1,11 @@
-package com.ticketrecipe.tickets.sell;
+package com.ticketrecipe.marketplace.sell;
 
 import com.google.zxing.*;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
 import com.ticketrecipe.api.ticket.TicketService;
 import com.ticketrecipe.common.*;
-import com.ticketrecipe.getcertify.verify.TicketVerificationException;
+import com.ticketrecipe.getcertify.GetCertifyException;
 import com.ticketrecipe.getcertify.verify.TicketVerificationResult;
 import com.ticketrecipe.getcertify.verify.TicketVerificationService;
 import lombok.RequiredArgsConstructor;
@@ -122,51 +122,67 @@ public class TicketUploadService {
         return importedTickets;
     }
 
-    private Ticket processSingleTicket(String objectKeyPath, String qrCodeData, PDDocument singlePageDoc, int ticketIndex) throws IOException {
-        TicketVerificationResult verifiedResult = null;
-        try {
-            verifiedResult = ticketVerificationService.validateTicket(qrCodeData);
-            log.info("GetCertify! Certified ticket details for ticket #{} : {}", ticketIndex, verifiedResult);
-        }
-        catch (TicketVerificationException tve) {
-            log.error("GetCertify failed for ticket #{}. Skipping validation for ticket.", ticketIndex);
-        }
+    private Ticket processSingleTicket(
+            String objectKeyPath,
+            String qrCodeData,
+            PDDocument singlePageDoc,
+            int ticketIndex
+    ) throws IOException {
 
+        // Import ticket details from PDF
         Ticket ticket = importTicket(singlePageDoc);
-
-        ticket.setEventId(verifiedResult.getEventId());
-
         log.info("Imported ticket #{} with details: {}", ticketIndex, ticket);
 
+        // Generate and set thumbnail URL
         String thumbnailKey = saveThumbnail(singlePageDoc, objectKeyPath);
         String thumbnailUrl = generateSignedUrl(thumbnailKey);
         ticket.setThumbnailUrl(thumbnailUrl);
 
-        if (verifiedResult!=null) {
-            boolean validatedResult = Objects.equals(verifiedResult.getPurchaserName(), ticket.getPurchaser().getFullName()) &&
+        try {
+            // Attempt to verify the ticket
+            TicketVerificationResult verifiedResult = ticketVerificationService.validateTicket(qrCodeData);
+            log.info("GetCertify! Certified ticket details for ticket #{} : {}", ticketIndex, verifiedResult);
+            ticket.setEventId(verifiedResult.getEventId());
+            ticket.setCertifiedId(verifiedResult.getId());
+
+            // Check if the ticket already exists in the database
+           boolean isExistingTicket = ticketService.existsByCertifiedId(verifiedResult.getId());
+           if (isExistingTicket) {
+                log.warn("Ticket #{} already exists in the system. Marking as EXISTING_TICKET.", ticketIndex);
+                ticket.setStatus(TicketStatus.EXISTING);
+                return ticket; // Early return; no need to save
+            }
+
+            // Validate ticket details against certification result
+            boolean isValid = Objects.equals(verifiedResult.getPurchaserName(), ticket.getPurchaser().getFullName()) &&
                     Objects.equals(verifiedResult.getSection(), ticket.getSection()) &&
                     Objects.equals(verifiedResult.getRow(), ticket.getRow()) &&
                     Objects.equals(verifiedResult.getSeat(), ticket.getSeat()) &&
                     Objects.equals(verifiedResult.getPrice(), ticket.getPrice());
 
-            // Validate extracted details against GetCertify details
-            if (!validatedResult) {
-                log.error("Data mismatch for ticket #{}. Skipping ticket.", ticketIndex);
+            if (!isValid) {
+                log.error("Data mismatch for ticket #{}. Marking as INVALID.", ticketIndex);
                 ticket.setStatus(TicketStatus.INVALID);
-                return ticket;
+                return ticket; // Early return; do not save or process further
             }
-            else {
-                ticket.setStatus(TicketStatus.GC_VERIFIED);
-            }
-        }
-        else {
-            ticket.setStatus(TicketStatus.NOT_VERIFIABLE);
-        }
-        String pdfObjectKey = saveToS3(singlePageDoc, objectKeyPath + UUID.randomUUID().toString() + ".pdf", PDF_CONTENT_TYPE);
-        //String preSignedUrl = generateSignedUrl(ticketKey);
-        ticket.setPdfS3ObjectKey(pdfObjectKey);
 
-        ticketService.saveTicket(ticket);
+            // Mark as verified and set event details
+            ticket.setStatus(TicketStatus.GC_VERIFIED);
+
+            // Save only verified tickets
+            String pdfObjectKey = saveToS3(
+                    singlePageDoc,
+                    objectKeyPath + UUID.randomUUID().toString() + ".pdf",
+                    PDF_CONTENT_TYPE
+            );
+            ticket.setPdfS3ObjectKey(pdfObjectKey);
+            ticketService.saveTicket(ticket);
+
+        } catch (GetCertifyException gce) {
+            log.error("GetCertify failed for ticket #{} with error #{}. Skipping validation.", ticketIndex, gce.getErrorCode());
+            ticket.setStatus(TicketStatus.valueOf(gce.getErrorCode()));
+            return ticket; // Early return for unverifiable tickets
+        }
         return ticket;
     }
 
@@ -225,7 +241,7 @@ public class TicketUploadService {
             PDFTextStripper pdfStripper = new PDFTextStripper();
             String text = pdfStripper.getText(document);
 
-            log.info(text);
+            //log.info(text);
 
             String purchaserName = extractFieldValue(text, "Name", "Patron Name", "Patron Full Name");
             String category = extractFieldValue(text, "Category");

@@ -2,7 +2,7 @@ package com.ticketrecipe.common.listing;
 
 import com.ticketrecipe.common.Price;
 
-public record ConfirmedListing(
+public record ConfirmListingDto(
         String listingId,
         Price sellingPrice
 ) {}

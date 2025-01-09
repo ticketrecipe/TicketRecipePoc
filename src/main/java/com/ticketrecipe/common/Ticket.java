@@ -1,5 +1,6 @@
 package com.ticketrecipe.common;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,13 +17,18 @@ public class Ticket {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "ticket_id")
+    @Column(name = "id")
     private String id;
 
     @Column(name = "event_id", nullable = false)
     private String eventId;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    //OneToOne
+    @JsonIgnore
+    @Column(name = "certified_id", nullable = true, unique = true)
+    private String certifiedId;
+
+    @ManyToOne(cascade = CascadeType.PERSIST)
     @JoinColumn(name = "owner_id", referencedColumnName = "id")
     private User purchaser;       // The name of the ticket holder
 
@@ -57,6 +63,7 @@ public class Ticket {
     private TicketStatus status;
 
     // The S3 object key to access the ticket's full PDF
+    @JsonIgnore
     @Column(name = "pdf_s3_object_key")
     private String pdfS3ObjectKey;
 

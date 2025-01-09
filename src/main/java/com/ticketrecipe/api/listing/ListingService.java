@@ -1,30 +1,27 @@
 package com.ticketrecipe.api.listing;
 
 import com.ticketrecipe.common.Price;
-import com.ticketrecipe.common.SeatInventory;
+import com.ticketrecipe.common.ListingInventory;
 import com.ticketrecipe.common.Ticket;
 import com.ticketrecipe.common.TicketType;
-import com.ticketrecipe.common.listing.ConfirmedListing;
-import com.ticketrecipe.tickets.sell.SellerController;
-import com.ticketrecipe.tickets.sell.TicketResponse;
+import com.ticketrecipe.common.listing.ConfirmListingDto;
+import com.ticketrecipe.getcertify.registry.GetCertifyRegistryService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ListingService {
-
-    private final ListingRepository listingRepository;
-
     @Autowired
-    public ListingService(ListingRepository listingRepository) {
-        this.listingRepository = listingRepository;
-    }
+    private GetCertifyRegistryService gCertifyRegistryService;
+    @Autowired
+    private ListingRepository listingRepository;
 
     private Listing saveListing (List<Ticket> tickets) {
         Ticket firstTicket = tickets.get(0);
@@ -40,18 +37,19 @@ public class ListingService {
                 .status(ListingStatus.DRAFT)
                 .build();
 
-        List<SeatInventory> seats = new ArrayList<SeatInventory>();
+        List<ListingInventory> seats = new ArrayList<ListingInventory>();
         for (Ticket ticket : tickets) {
             if (TicketType.RESERVED_SEATING.equals(ticket.getTicketType())){
-                seats.add(SeatInventory.builder()
+                seats.add(ListingInventory.builder()
                         .seat(ticket.getSeat())
                         .row(ticket.getRow())
                         .section(ticket.getSection())
-                                .listing(listing)
+                        .listing(listing)
+                        .ticket(ticket)
                         .build());
             }
         }
-        listing.setSeats(seats);
+        listing.setInventories(seats);
         Price originalPrice = firstTicket.getPrice();
         listing.setMaximumSellingPrice(new Price(originalPrice.getAmount() * 3, originalPrice.getCurrency()));
         return listingRepository.save(listing);
@@ -129,5 +127,47 @@ public class ListingService {
 
         // Check if the current seat is the next one after the previous seat
         return currentSeat == previousSeat + 1;
+    }
+
+    @Transactional
+    public List<Listing> confirmListings(List<ConfirmListingDto> listings) {
+        // Step 1: Retrieve all listings in a single query
+        List<String> listingIds = listings.stream()
+                .map(ConfirmListingDto::listingId)
+                .toList();
+
+        List<Listing> fetchedListings = listingRepository.findAllById(listingIds);
+
+        // Step 2: Validate if any listings are missing
+        if (fetchedListings.size() != listingIds.size()) {
+            throw new IllegalArgumentException("Some listings were not found.");
+        }
+
+        // Step 3: Prepare certified tickets in registry to lock in
+        List<String> ticketIds = fetchedListings.stream()
+                .flatMap(listing -> listing.getInventories().stream())
+                .map(inventory -> inventory.getTicket().getCertifiedId())
+                .toList();
+
+        // Lock all tickets in a batch
+        boolean locked = gCertifyRegistryService.lockTickets(ticketIds);
+        if (!locked) {
+            throw new IllegalStateException("Failed to lock one or more tickets.");
+        }
+
+        // Step 4: Update all listings and their statuses
+        Map<String, ConfirmListingDto> dtoMap = listings.stream()
+                .collect(Collectors.toMap(ConfirmListingDto::listingId, dto -> dto));
+
+        fetchedListings.forEach(listing -> {
+            ConfirmListingDto dto = dtoMap.get(listing.getId().toString());
+
+            // Update price and status
+            listing.setSellingPrice(dto.sellingPrice());
+            listing.setStatus(ListingStatus.ACTIVE);
+        });
+
+        // Step 5: Save all listings in batch
+        return listingRepository.saveAll(fetchedListings);
     }
 }

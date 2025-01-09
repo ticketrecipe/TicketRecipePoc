@@ -2,11 +2,11 @@ package com.ticketrecipe.getcertify;
 
 import org.springframework.http.HttpStatus;
 
-public class TicketRegistryException extends RuntimeException {
+public class GetCertifyException extends RuntimeException {
 
     private final String errorCode;
 
-    public TicketRegistryException(String message, String errorCode) {
+    public GetCertifyException(String message, String errorCode) {
         super(message);
         this.errorCode = errorCode;
     }
