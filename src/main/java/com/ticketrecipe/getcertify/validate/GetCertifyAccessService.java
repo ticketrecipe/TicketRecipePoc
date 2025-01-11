@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 @Service
 @RequiredArgsConstructor
@@ -22,11 +24,9 @@ public class GetCertifyAccessService {
 
     public SecuredAccessCode getSecuredAccessCode(String qrCodeData) {
         try {
-
             if (!qrCodeData.startsWith(qrCodeBaseUrl)) {
                 throw new GetCertifyException("Invalid GetCertify! QR Code URL", "INVALID_GC_QR_CODE");
             }
-
             String qrCodePath = qrCodeData.substring(qrCodeBaseUrl.length());
             String[] qrCodeParts = qrCodePath.split("\\.");
             if (qrCodeParts.length != 2) {
@@ -34,7 +34,11 @@ public class GetCertifyAccessService {
             }
 
             String refId = qrCodeParts[0];
-            String encryptedPayload = qrCodeParts[1];
+            String encryptedPayloadBase64 = qrCodeParts[1];
+
+            // Step 3: Decode the Base64-encoded payload
+            byte[] encryptedPayloadBytes = Base64.getDecoder().decode(encryptedPayloadBase64);
+            String encryptedPayload = new String(encryptedPayloadBytes, StandardCharsets.UTF_8);
 
             // Retrieve the ticket by uniqueId
             CertifiedTicket ticket = ticketRegistryRepository.findByReferenceId(refId)

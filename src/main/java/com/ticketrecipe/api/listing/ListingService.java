@@ -7,6 +7,7 @@ import com.ticketrecipe.common.TicketType;
 import com.ticketrecipe.common.listing.ConfirmListingDto;
 import com.ticketrecipe.getcertify.registry.GetCertifyRegistryService;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class ListingService {
     @Autowired
     private GetCertifyRegistryService gCertifyRegistryService;

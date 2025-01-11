@@ -14,9 +14,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @Table(name = "users")
 public class User {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @JsonIgnore
     private String id;
     private String fullName;
+    private String emailAddress;
+
 }

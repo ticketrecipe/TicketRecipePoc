@@ -1,4 +1,4 @@
-package com.ticketrecipe.marketplace.configuraton;
+package com.ticketrecipe.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -11,7 +11,7 @@ public class CorsConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         // Allow CORS for all paths
         registry.addMapping("/**")
-                .allowedOrigins("http://localhost:3000")  // Allow localhost:3000 for development
+                .allowedOrigins("http://localhost:3000","https://main.d3shnslwbw8wup.amplifyapp.com/")  // Allow localhost:3000 for development
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")  // Allow OPTIONS (for preflight)
                 .allowedHeaders("*")  // Allow all headers
                 .allowCredentials(true)  // Allow credentials (cookies, authorization headers)

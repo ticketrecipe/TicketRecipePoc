@@ -34,7 +34,7 @@ public class GetCertifyController {
 
     @PostMapping("/getcertify/ticket/verify")
     public ResponseEntity<TicketVerificationResult> verifyTicket(@RequestBody  GetCertifyQRCode request) {
-        TicketVerificationResult response = ticketVerificationService.validateTicket(request.getQrCodeData());
+        TicketVerificationResult response = ticketVerificationService.verify(request.getQrCodeData());
         return ResponseEntity.ok(response);
     }
 

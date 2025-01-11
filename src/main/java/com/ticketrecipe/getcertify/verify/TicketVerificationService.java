@@ -11,6 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -23,7 +26,7 @@ public class TicketVerificationService {
     private String qrCodeBaseUrl;
 
     @Transactional
-    public TicketVerificationResult validateTicket(String qrCodeData) {
+    public TicketVerificationResult verify(String qrCodeData) {
         try {
             // Step 1: Validate the QR code URL format
             if (!qrCodeData.startsWith(qrCodeBaseUrl)) {
@@ -38,7 +41,11 @@ public class TicketVerificationService {
             }
 
             String refId = qrCodeParts[0];
-            String encryptedPayload = qrCodeParts[1];
+            String encryptedPayloadBase64 = qrCodeParts[1];
+
+            // Step 3: Decode the Base64-encoded payload
+            byte[] encryptedPayloadBytes = Base64.getDecoder().decode(encryptedPayloadBase64);
+            String encryptedPayload = new String(encryptedPayloadBytes, StandardCharsets.UTF_8);
 
             // Step 3: Retrieve the ticket by its reference ID
             CertifiedTicket ticket = ticketRegistryRepository.findByReferenceId(refId)

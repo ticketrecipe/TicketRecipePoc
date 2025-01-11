@@ -3,9 +3,9 @@ package com.ticketrecipe.api.ticket;
 import com.ticketrecipe.common.Ticket;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
+import java.util.Optional;
 
 public interface TicketRepository extends JpaRepository<Ticket, String> {
     List<Ticket> findByEventId(String eventId);
-
-    boolean existsByCertifiedId(String certifiedId);
+    Optional<Ticket> findByCertifiedId(String id);
 }
