@@ -1,13 +1,16 @@
 package com.ticketrecipe.getcertify.registry;
 
-import com.ticketrecipe.common.SecureQrCodeHelper;
-import com.ticketrecipe.common.security.SecurePayloadEncrypter;
+import com.ticketrecipe.api.event.EventRepository;
+import com.ticketrecipe.api.event.EventService;
+import com.ticketrecipe.common.Event;
+import com.ticketrecipe.common.Price;
+import com.ticketrecipe.common.getcertify.SecureQrCodeHelper;
+import com.ticketrecipe.common.getcertify.SecurePayloadEncrypter;
 import com.ticketrecipe.getcertify.CertifiedTicket;
 import com.ticketrecipe.getcertify.GetCertifyException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import javax.crypto.SecretKey;
@@ -29,24 +32,36 @@ public class GetCertifyRegistryService {
     private SecurePayloadEncrypter qrCodeEncrypter;
     @Autowired
     private SecureQrCodeHelper qrCodeGenerator;
+    @Autowired
+    private EventService eventService;
 
     @Transactional
     public TicketRegistryResponse certifyTickets(TicketCertifyRequest request) {
         log.info("Certifying tickets for event: {}", request.getEventName());
         try {
+            Event event = eventService.getEvent(request.getEventId())
+                    .orElseGet(() -> {
+                        Event newEvent = Event.builder()
+                                .id(request.getEventId())
+                                .name(request.getEventName())
+                                .startDateTime(request.getStartDateTime())
+                                .issuer("TM")
+                                .venueName(request.getVenue().getName())
+                                .address(request.getVenue().getAddress())
+                                .build();
+                        return eventService.createEvent(newEvent);
+                    });
+
             List<TicketRegistryResponse.TicketQRCode> qrCodeList = request.getTickets().stream().map(ticketDto -> {
                 try {
                     // Check if ticket already exists by barcode ID
                     String referenceId = hash(ticketDto.getBarcodeId());
+
                     CertifiedTicket ticket = ticketRegistryRepository.findByReferenceId(referenceId)
                             .orElse(new CertifiedTicket()); // Create new or overwrite existing
 
-                    ticket.setEventId(request.getEventId());
-                    ticket.setEventName(request.getEventName());
-                    ticket.setStartDateTime(request.getStartDateTime());
-                    ticket.setIssuer("TM");
-                    ticket.setVenue(new CertifiedTicket.Venue(request.getVenue().getName(), request.getVenue().getAddress()));
-                    ticket.setPrice(new CertifiedTicket.Price(ticketDto.getPrice().getAmount(), ticketDto.getPrice().getCurrency()));
+                    ticket.setEvent(event);
+                    ticket.setPrice(new Price(ticketDto.getPrice().getAmount(), ticketDto.getPrice().getCurrency()));
                     ticket.setCategory(ticketDto.getCategory());
                     ticket.setType(ticketDto.getType());
                     ticket.setEntrance(ticketDto.getEntrance());

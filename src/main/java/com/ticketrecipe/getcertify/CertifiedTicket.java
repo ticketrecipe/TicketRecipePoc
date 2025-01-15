@@ -1,7 +1,10 @@
 package com.ticketrecipe.getcertify;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ticketrecipe.common.Event;
+import com.ticketrecipe.common.Price;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -22,49 +25,12 @@ public class CertifiedTicket {
     @Column(name = "aes_key", nullable = false, unique = false)
     private String aesKey;
 
-    @Column(name = "event_id", nullable = false)
-    private String eventId;
-
-    @Column(name = "event_name", nullable = false)
-    private String eventName;
-
-    @Column(name = "start_date_time", nullable = false)
-    private String startDateTime;
-
-    @Column(name = "issuer", nullable = false)
-    private String issuer;
-
-    @Embedded
-    private Venue venue;
-
-    @Data
-    @Embeddable
-    @NoArgsConstructor
-    public static class Venue {
-        private String name;
-        private String address;
-
-        public Venue(String name, String address) {
-            this.name = name;
-            this.address=address;
-        }
-    }
+    @ManyToOne(cascade = {CascadeType.PERSIST})
+    @JoinColumn(name = "event_id", nullable = false)
+    private Event event;
 
     @Embedded
     private Price price;
-
-    @Data
-    @Embeddable
-    @NoArgsConstructor
-    public static class Price {
-        private Double amount;
-        private String currency;
-
-        public Price(double amount, String currency) {
-            this.amount = amount;
-            this.currency = currency;
-        }
-    }
 
     @Column(name = "entrance")
     private String entrance;

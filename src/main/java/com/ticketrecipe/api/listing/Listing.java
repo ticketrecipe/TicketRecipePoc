@@ -1,9 +1,7 @@
 package com.ticketrecipe.api.listing;
 
-import com.ticketrecipe.common.Price;
-import com.ticketrecipe.common.ListingInventory;
-import com.ticketrecipe.common.TicketType;
-import com.ticketrecipe.common.User;
+import com.ticketrecipe.common.*;
+import com.ticketrecipe.common.listing.ListingType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,15 +17,19 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Listing {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    private String eventId;
+    @ManyToOne
+    @JoinColumn(name = "event_id", nullable = false)
+    private Event event;
 
     @Enumerated(EnumType.STRING)
     private ListingStatus status;
+
+    @Enumerated(EnumType.STRING)
+    private ListingType type;
 
     private TicketType ticketType;
 

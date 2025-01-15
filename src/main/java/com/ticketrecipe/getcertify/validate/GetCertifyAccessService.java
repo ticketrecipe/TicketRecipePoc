@@ -2,7 +2,7 @@ package com.ticketrecipe.getcertify.validate;
 
 import com.ticketrecipe.getcertify.CertifiedTicket;
 import com.ticketrecipe.getcertify.registry.TicketRegistryRepository;
-import com.ticketrecipe.common.security.SecurePayloadEncrypter;
+import com.ticketrecipe.common.getcertify.SecurePayloadEncrypter;
 import com.ticketrecipe.getcertify.GetCertifyException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

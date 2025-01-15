@@ -6,6 +6,7 @@ import com.google.zxing.common.HybridBinarizer;
 import com.ticketrecipe.api.ticket.TicketService;
 import com.ticketrecipe.api.user.UserService;
 import com.ticketrecipe.common.*;
+import com.ticketrecipe.common.auth.CustomUserDetails;
 import com.ticketrecipe.common.util.S3Util;
 import com.ticketrecipe.getcertify.GetCertifyException;
 import com.ticketrecipe.getcertify.verify.TicketVerificationResult;
@@ -40,12 +41,12 @@ public class TicketUploadService {
 
     private static final int DPI = 300;
 
-    public List<Ticket> processUploadedTickets(String objectKey, String userId) throws IOException {
+    public List<Ticket> processUploadedTickets(String objectKey, CustomUserDetails userDetails) throws IOException {
 
         log.info("Importing uploaded PDF Tickets from S3 with S3 objectKey: {}", objectKey);
 
         // Retrieve the user using the service
-        User seller = userService.getUserById(userId);
+        User seller = userService.getUserById(userDetails.getUsername());
         log.info("Seller: {}", seller);
 
         try (ResponseInputStream<GetObjectResponse> s3ObjectStream = s3Util.getObjectStream(objectKey);
@@ -57,9 +58,6 @@ public class TicketUploadService {
     }
 
     private List<Ticket> extractTicketsFromDocument(PDDocument document, User seller) throws IOException {
-        String currentYearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        String sessionUuid = UUID.randomUUID().toString();
-        String objectKeyPath = String.format("%s/%s/", currentYearMonth, sessionUuid);
 
         PDFRenderer pdfRenderer = new PDFRenderer(document);
         PDDocument currentTicketDoc = null;
@@ -90,7 +88,7 @@ public class TicketUploadService {
                     log.info("Detected start of a new ticket on page {}: {}", pageIndex + 1, decodedText);
 
                     if (currentTicketDoc != null) {
-                        importedTickets.add(processSingleTicket(seller, objectKeyPath, currentDecodedText, currentTicketDoc, ticketIndex++));
+                        importedTickets.add(processSingleTicket(seller, currentDecodedText, currentTicketDoc, ticketIndex++));
                     }
 
                     currentDecodedText = decodedText;
@@ -108,7 +106,7 @@ public class TicketUploadService {
         // Finalize the last ticket
         if (currentTicketDoc != null) {
             try {
-                importedTickets.add(processSingleTicket(seller, objectKeyPath, currentDecodedText, currentTicketDoc, ticketIndex));
+                importedTickets.add(processSingleTicket(seller, currentDecodedText, currentTicketDoc, ticketIndex));
             } finally {
                 currentTicketDoc.close(); // Ensure the document is closed
             }
@@ -119,7 +117,6 @@ public class TicketUploadService {
 
     private Ticket processSingleTicket(
             User seller,
-            String objectKeyPath,
             String qrCodeData,
             PDDocument singlePageDoc,
             int ticketIndex
@@ -132,7 +129,6 @@ public class TicketUploadService {
         try {
             TicketVerificationResult verifiedResult = ticketVerificationService.verify(qrCodeData);
             log.info("GetCertify! Certified ticket details for ticket #{} : {}", ticketIndex, verifiedResult);
-            ticket.setEventId(verifiedResult.getEventId());
             ticket.setCertifiedId(verifiedResult.getId());
 
             // Check if the ticket already exists in the system
@@ -145,7 +141,8 @@ public class TicketUploadService {
             }
 
             // Validate ticket details against certification result
-            boolean isValid = Objects.equals(verifiedResult.getPurchaserName(), ticket.getPurchaser().getFullName()) &&
+            boolean isValid =
+                    Objects.equals(verifiedResult.getPurchaserName(), ticket.getPurchaser().getFullName()) &&
                     Objects.equals(verifiedResult.getSection(), ticket.getSection()) &&
                     Objects.equals(verifiedResult.getRow(), ticket.getRow()) &&
                     Objects.equals(verifiedResult.getSeat(), ticket.getSeat()) &&
@@ -159,6 +156,9 @@ public class TicketUploadService {
 
             // Mark as verified and set event details
             ticket.setStatus(TicketStatus.GC_VERIFIED);
+            ticket.setEvent(verifiedResult.getEvent());
+
+            String objectKeyPath = String.format("%s/%s/", verifiedResult.getEvent().getId(), verifiedResult.getRefId());
 
             // Save thumbnail and Generate thumbnail URL
             String thumbnailKey = saveThumbnail(singlePageDoc, objectKeyPath);
@@ -169,7 +169,7 @@ public class TicketUploadService {
             ticket.setThumbnailUrl(thumbnailUrl);
 
             // Save only verified tickets
-            String pdfObjectKey = s3Util.savePdfToS3(singlePageDoc, objectKeyPath + UUID.randomUUID().toString() + ".pdf");
+            String pdfObjectKey = s3Util.savePdfToS3(singlePageDoc, objectKeyPath + verifiedResult.getRefId() + ".pdf");
             ticket.setPdfObjectKey(pdfObjectKey);
             ticket.setPurchaser(seller);
             ticketService.saveTicket(ticket);
@@ -177,7 +177,9 @@ public class TicketUploadService {
         } catch (GetCertifyException gce) {
             log.error("GetCertify failed for ticket #{} with error #{}. Skipping validation.", ticketIndex, gce.getErrorCode());
 
-            // Generate and set thumbnail URL
+            String objectKeyPath = String.format("%s/%s/", "temp", UUID.randomUUID().toString());
+
+            // Generate and set thumbnail URL to temp
             String thumbnailKey = saveThumbnail(singlePageDoc, objectKeyPath);
             String thumbnailUrl = s3Util.generateSignedUrl(thumbnailKey);
             //TO:DO
@@ -195,7 +197,7 @@ public class TicketUploadService {
         BufferedImage thumbnail = Thumbnails.of(image)
                 .size(image.getWidth() / 2, image.getHeight() / 2)
                 .asBufferedImage();
-        return s3Util.saveImageToS3(thumbnail, objectKeyPath + UUID.randomUUID().toString() + "_thumbnail.jpg");
+        return s3Util.saveImageToS3(thumbnail, objectKeyPath  + "thumbnail.jpg");
     }
 
     private Ticket importTicket(PDDocument document) {

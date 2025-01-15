@@ -1,6 +1,7 @@
 package com.ticketrecipe.common;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,15 +21,18 @@ public class Ticket {
     @Column(name = "id")
     private String id;
 
-    @Column(name = "event_id", nullable = false)
-    private String eventId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "event_id", nullable = false)
+    @JsonIgnore
+    private Event event;
 
     @JsonIgnore
     @Column(name = "certified_id", nullable = true, unique = true)
     private String certifiedId;
 
-    @ManyToOne(cascade = CascadeType.PERSIST)
+    @ManyToOne(cascade = CascadeType.PERSIST, fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", referencedColumnName = "id")
+    @JsonIgnore
     private User purchaser;
 
     @Column(name = "category", nullable = false)
@@ -69,6 +73,7 @@ public class Ticket {
     @Column(name = "thumbnail_ok")
     private String thumbnailObjectKey;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     @Transient
     private String thumbnailUrl;
 }

@@ -6,6 +6,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TicketRepository extends JpaRepository<Ticket, String> {
-    List<Ticket> findByEventId(String eventId);
+
     Optional<Ticket> findByCertifiedId(String id);
+
+    List<Ticket> findByPurchaserId(String purchaserId);
+
+    List<Ticket> findByPurchaserIdAndEventId(String userId, String eventId);
 }

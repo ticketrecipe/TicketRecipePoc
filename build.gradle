@@ -43,6 +43,15 @@ dependencies {
     implementation 'com.google.zxing:core:3.5.2'
     implementation 'com.google.zxing:javase:3.5.2'
 
+    // Jakarta Validation API
+    implementation 'jakarta.validation:jakarta.validation-api:3.0.2'
+
+    // Hibernate Validator
+    implementation 'org.hibernate.validator:hibernate-validator:7.0.2.Final'
+
+    // Dependency required for EL (Expression Language)
+    implementation 'org.glassfish:jakarta.el:4.0.2'
+
     runtimeOnly 'com.h2database:h2' // Replace with your DB of choice
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

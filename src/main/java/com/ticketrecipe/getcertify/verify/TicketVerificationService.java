@@ -1,10 +1,11 @@
 package com.ticketrecipe.getcertify.verify;
 
+import com.ticketrecipe.common.Event;
 import com.ticketrecipe.common.TicketStatus;
 import com.ticketrecipe.getcertify.CertifiedTicket;
 import com.ticketrecipe.getcertify.GetCertifyException;
 import com.ticketrecipe.getcertify.registry.TicketRegistryRepository;
-import com.ticketrecipe.common.security.SecurePayloadEncrypter;
+import com.ticketrecipe.common.getcertify.SecurePayloadEncrypter;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,24 +68,21 @@ public class TicketVerificationService {
             String purchaserName = payloadParts[2].split(":")[1]; // Extract purchaser name
 
             // Step 6: Build and return the response with verifiable ticket details
-            return new TicketVerificationResult(
-                    ticket.getId(),
-                    purchaserEmailAddress,
-                    ticket.getEventId(),
-                    ticket.getEventName(),
-                    ticket.getStartDateTime(),
-                    ticket.getIssuer(),
-                    ticket.getVenue().getName(),
-                    ticket.getVenue().getAddress(),
-                    purchaserName,
-                    ticket.getCategory(),
-                    ticket.getType(),
-                    ticket.getRow(),
-                    ticket.getSeat(),
-                    ticket.getSection(),
-                    ticket.getPrice().getAmount(),
-                    ticket.getPrice().getCurrency()
-            );
+            TicketVerificationResult result =
+                    TicketVerificationResult.builder()
+                            .id(ticket.getId())
+                            .refId(refId)
+                            .purchaserName(purchaserName)
+                            .purchaserEmailAddress(purchaserEmailAddress)
+                            .event(ticket.getEvent())
+                            .category(ticket.getCategory())
+                            .type(ticket.getType())
+                            .row(ticket.getRow())
+                            .seat(ticket.getSeat())
+                            .section(ticket.getSection())
+                            .price(ticket.getPrice())
+                            .build();
+            return result;
 
         } catch (GetCertifyException e) {
             throw e; // Re-throw custom exceptions

@@ -28,7 +28,7 @@ public class ListingService {
     private Listing saveListing (List<Ticket> tickets) {
         Ticket firstTicket = tickets.get(0);
         Listing listing = Listing.builder()
-                .eventId(firstTicket.getEventId())
+                .event(firstTicket.getEvent())
                 .seller(firstTicket.getPurchaser())
                 .quantity(tickets.size())
                 .category(firstTicket.getCategory())

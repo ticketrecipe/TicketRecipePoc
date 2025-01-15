@@ -1,4 +1,4 @@
-package com.ticketrecipe.common.security;
+package com.ticketrecipe.common.getcertify;
 
 import org.springframework.stereotype.Component;
 

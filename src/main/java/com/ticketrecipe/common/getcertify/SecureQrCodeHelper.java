@@ -1,4 +1,4 @@
-package com.ticketrecipe.common;
+package com.ticketrecipe.common.getcertify;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
