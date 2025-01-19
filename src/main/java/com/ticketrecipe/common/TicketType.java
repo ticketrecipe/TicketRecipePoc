@@ -1,16 +1,27 @@
 package com.ticketrecipe.common;
 
 public enum TicketType {
-    GENERAL_ADMISSION("GA"),
-    RESERVED_SEATING("RS");
+    GA("GENERAL_ADMISSION"),
+    RS("RESERVED_SEATING");
 
-    private final String code;
+    private final String desc;
 
-    TicketType(String code) {
-        this.code = code;
+    TicketType(String desc) {
+        this.desc = desc;
     }
 
-    public String getCode() {
-        return code;
+    @Override
+    public String toString() {
+        return desc;
+    }
+
+    public static TicketType fromString(String desc) {
+        for (TicketType type : TicketType.values()) {
+            if (type.desc.equals(desc)) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("Unknown code: " + desc);
     }
 }
+

@@ -18,13 +18,13 @@ public class EventController {
 
     @GetMapping("/purchases")
     public List<PurchasedEvent> getPurchasedEvents(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        return eventService.getPurchasedEvents(userDetails.getUsername());
+        return eventService.getPurchasedEvents(userDetails.getUserId());
     }
 
     @GetMapping("/purchases/{eventId}/tickets")
     public PurchasedEventTickets getTicketsForEvent(
             @PathVariable String eventId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return eventService.getTicketsForUserAndEvent(userDetails.getUsername(), eventId);
+        return eventService.getTicketsForUserAndEvent(userDetails.getUserId(), eventId);
     }
 }

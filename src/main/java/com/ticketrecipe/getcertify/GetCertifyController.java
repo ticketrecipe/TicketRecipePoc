@@ -6,7 +6,7 @@ import com.ticketrecipe.getcertify.registry.TicketRegistryResponse;
 import com.ticketrecipe.getcertify.validate.GetCertifyAccessService;
 import com.ticketrecipe.getcertify.validate.SecuredAccessCode;
 import com.ticketrecipe.getcertify.verify.TicketVerificationResult;
-import com.ticketrecipe.getcertify.verify.TicketVerificationService;
+import com.ticketrecipe.getcertify.verify.GetCertifyVerificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +24,7 @@ public class GetCertifyController {
     @Autowired
     private GetCertifyAccessService getCertifyAccessService;
     @Autowired
-    private TicketVerificationService ticketVerificationService;
+    private GetCertifyVerificationService ticketVerificationService;
 
     @PostMapping("/certify/tickets")
     public ResponseEntity<TicketRegistryResponse> certifyTickets(@RequestBody TicketCertifyRequest request) {
@@ -34,14 +34,14 @@ public class GetCertifyController {
 
     @PostMapping("/getcertify/ticket/verify")
     public ResponseEntity<TicketVerificationResult> verifyTicket(@RequestBody  GetCertifyQRCode request) {
-        TicketVerificationResult response = ticketVerificationService.verify(request.getQrCodeData());
+        TicketVerificationResult response = ticketVerificationService.verify(request.getCertifyQrCode());
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/getcertify/ticket/validate")
     public ResponseEntity<SecuredAccessCode> validateTicket(@RequestBody GetCertifyQRCode request) {
         try {
-            SecuredAccessCode response = getCertifyAccessService.getSecuredAccessCode(request.getQrCodeData());
+            SecuredAccessCode response = getCertifyAccessService.getSecuredAccessCode(request.getCertifyQrCode());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(null);

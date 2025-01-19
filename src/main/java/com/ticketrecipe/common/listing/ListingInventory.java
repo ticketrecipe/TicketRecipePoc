@@ -1,12 +1,17 @@
-package com.ticketrecipe.common;
+package com.ticketrecipe.common.listing;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.ticketrecipe.api.listing.Listing;
+import com.ticketrecipe.common.Ticket;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Data
@@ -34,4 +39,14 @@ public class ListingInventory {
     @JsonIgnore
     @JoinColumn(name = "listing_id", nullable = false)
     private Listing listing;
+
+    private InventoryStatus status;
+
+    @CreationTimestamp
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private LocalDateTime lastUpdatedDate;
 }

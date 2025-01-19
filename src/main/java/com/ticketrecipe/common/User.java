@@ -37,7 +37,7 @@ public class User {
 
     @CreationTimestamp
     @Column(nullable = false)
-    private LocalDateTime createdDate;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)

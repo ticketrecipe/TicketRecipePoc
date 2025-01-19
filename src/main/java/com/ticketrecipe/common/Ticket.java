@@ -7,6 +7,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Data
@@ -19,6 +23,7 @@ public class Ticket {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -27,27 +32,30 @@ public class Ticket {
     private Event event;
 
     @JsonIgnore
-    @Column(name = "certified_id", nullable = true, unique = true)
-    private String certifiedId;
+    @Column(name = "certify_id", nullable = true, unique = true)
+    private String certifyId;
 
-    @ManyToOne(cascade = CascadeType.PERSIST, fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", referencedColumnName = "id")
     @JsonIgnore
     private User purchaser;
 
+    @Column(name = "printed_name", nullable = false)
+    private String printedName;
+
     @Column(name = "category", nullable = false)
     private String category;
 
-    @Column(name = "seat")
+    @Column(name = "seat", nullable = false)
     private String seat;
 
-    @Column(name = "seatRow")
+    @Column(name = "seatRow", nullable = false)
     private String row;
 
-    @Column(name = "section")
+    @Column(name = "section", nullable = false)
     private String section;
 
-    @Column(name = "entrance")
+    @Column(name = "entrance", nullable = false)
     private String entrance;
 
     @Embedded
@@ -58,22 +66,37 @@ public class Ticket {
     private Price price;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "ticket_type")
+    @Column(name = "ticket_type",  nullable = false)
     private TicketType ticketType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @Column(name = "status", nullable = false)
     private TicketStatus status;
 
     @JsonIgnore
-    @Column(name = "pdf_ok")
+    @Column(name = "pdf_ok", nullable = false)
     private String pdfObjectKey;
 
     @JsonIgnore
-    @Column(name = "thumbnail_ok")
+    @Column(name = "thumbnail_ok", nullable = false)
     private String thumbnailObjectKey;
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @Transient
     private String thumbnailUrl;
+
+    @Lob
+    @Column(name = "gc_qr_code", columnDefinition = "CLOB")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String getCertifyQrCode;
+
+    @CreationTimestamp
+    @Column(nullable = false)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private LocalDateTime lastUpdatedDate;
 }

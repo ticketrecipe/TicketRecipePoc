@@ -1,7 +1,7 @@
 package com.ticketrecipe.getcertify.verify;
 
-import com.ticketrecipe.common.Event;
 import com.ticketrecipe.common.TicketStatus;
+import com.ticketrecipe.common.getcertify.SecureQrCodeHelper;
 import com.ticketrecipe.getcertify.CertifiedTicket;
 import com.ticketrecipe.getcertify.GetCertifyException;
 import com.ticketrecipe.getcertify.registry.TicketRegistryRepository;
@@ -18,10 +18,11 @@ import java.util.Base64;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class TicketVerificationService {
+public class GetCertifyVerificationService {
 
     private final TicketRegistryRepository ticketRegistryRepository;
-    private final SecurePayloadEncrypter qrCodeDecrypter;
+    private final SecurePayloadEncrypter securePayloadEncrypter;
+    private final SecureQrCodeHelper secureQrCodeHelper;
 
     @Value("${getcertify.qr.code.base.url}")
     private String qrCodeBaseUrl;
@@ -59,13 +60,15 @@ public class TicketVerificationService {
             }
 
             // Step 4: Decrypt the payload
-            String decryptedPayload = qrCodeDecrypter.decrypt(encryptedPayload, ticket.getAesKey());
+            String decryptedPayload = securePayloadEncrypter.decrypt(encryptedPayload, ticket.getAesKey());
 
             // Step 5: Parse the decrypted payload to extract the barcode and purchaser details
             String[] payloadParts = decryptedPayload.split(",");
             String barcodeId = payloadParts[0].split(":")[1];  // Extract barcodeId
             String purchaserEmailAddress = payloadParts[1].split(":")[1]; // Extract emailAddress
             String purchaserName = payloadParts[2].split(":")[1]; // Extract purchaser name
+
+            String based64QrCodeImage = secureQrCodeHelper.generate(refId, encryptedPayload);
 
             // Step 6: Build and return the response with verifiable ticket details
             TicketVerificationResult result =
@@ -81,6 +84,7 @@ public class TicketVerificationService {
                             .seat(ticket.getSeat())
                             .section(ticket.getSection())
                             .price(ticket.getPrice())
+                            .getCertifyQrCode(based64QrCodeImage)
                             .build();
             return result;
 

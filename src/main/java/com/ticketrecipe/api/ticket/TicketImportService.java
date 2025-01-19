@@ -1,16 +1,17 @@
-package com.ticketrecipe.marketplace.sell;
+package com.ticketrecipe.api.ticket;
 
 import com.google.zxing.*;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
-import com.ticketrecipe.api.ticket.TicketService;
+import com.ticketrecipe.api.event.EventRepository;
 import com.ticketrecipe.api.user.UserService;
 import com.ticketrecipe.common.*;
 import com.ticketrecipe.common.auth.CustomUserDetails;
 import com.ticketrecipe.common.util.S3Util;
 import com.ticketrecipe.getcertify.GetCertifyException;
+import com.ticketrecipe.getcertify.verify.GetCertifyVerificationService;
 import com.ticketrecipe.getcertify.verify.TicketVerificationResult;
-import com.ticketrecipe.getcertify.verify.TicketVerificationService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.coobird.thumbnailator.Thumbnails;
@@ -21,44 +22,49 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class TicketUploadService {
+public class TicketImportService {
 
-    private final TicketVerificationService ticketVerificationService;
+    private final GetCertifyVerificationService ticketVerificationService;
     private final TicketService ticketService;
+    private final EventRepository eventRepository;
     private final UserService userService;
     private final S3Util s3Util;
-
     private static final int DPI = 300;
 
-    public List<Ticket> processUploadedTickets(String objectKey, CustomUserDetails userDetails) throws IOException {
+    public ImportedTickets processUploadedPdf(String eventId,
+                                           String objectKey, CustomUserDetails userDetails) throws IOException {
 
-        log.info("Importing uploaded PDF Tickets from S3 with S3 objectKey: {}", objectKey);
+        log.info("Process uploaded Pdf Tickets from S3 with S3 objectKey: {} for user details: {}", objectKey, userDetails);
 
-        // Retrieve the user using the service
-        User seller = userService.getUserById(userDetails.getUsername());
-        log.info("Seller: {}", seller);
+        Event event = eventRepository.findById(eventId).orElseThrow(() ->
+                new EntityNotFoundException("Event not found for ID: " + eventId));
+
+        User user = userService.getUserById(userDetails.getUserId());
+        log.info("User: {}", user);
 
         try (ResponseInputStream<GetObjectResponse> s3ObjectStream = s3Util.getObjectStream(objectKey);
              PDDocument document = PDDocument.load(s3ObjectStream);)
         {
             log.info("Importing PDF with {} pages.", document.getNumberOfPages());
-            return extractTicketsFromDocument(document, seller);
+            List<Ticket> tickets = extractTicketsFromPdf(event, document, user);
+            ImportedTickets importedTickets = ImportedTickets.builder()
+                    .eventId(event.getId())
+                    .tickets(tickets)
+                    .purchaserId(user.getId())
+                    .build();
+            return importedTickets;
         }
     }
 
-    private List<Ticket> extractTicketsFromDocument(PDDocument document, User seller) throws IOException {
-
+    private List<Ticket> extractTicketsFromPdf(Event selectedEvent, PDDocument document, User user) throws IOException {
         PDFRenderer pdfRenderer = new PDFRenderer(document);
         PDDocument currentTicketDoc = null;
         int ticketIndex = 1;
@@ -88,7 +94,7 @@ public class TicketUploadService {
                     log.info("Detected start of a new ticket on page {}: {}", pageIndex + 1, decodedText);
 
                     if (currentTicketDoc != null) {
-                        importedTickets.add(processSingleTicket(seller, currentDecodedText, currentTicketDoc, ticketIndex++));
+                        importedTickets.add(processSingleTicket(selectedEvent, user, currentDecodedText, currentTicketDoc, ticketIndex++));
                     }
 
                     currentDecodedText = decodedText;
@@ -106,7 +112,7 @@ public class TicketUploadService {
         // Finalize the last ticket
         if (currentTicketDoc != null) {
             try {
-                importedTickets.add(processSingleTicket(seller, currentDecodedText, currentTicketDoc, ticketIndex));
+                importedTickets.add(processSingleTicket(selectedEvent, user, currentDecodedText, currentTicketDoc, ticketIndex));
             } finally {
                 currentTicketDoc.close(); // Ensure the document is closed
             }
@@ -116,8 +122,7 @@ public class TicketUploadService {
     }
 
     private Ticket processSingleTicket(
-            User seller,
-            String qrCodeData,
+            Event selectedEvent, User user, String qrCodeData,
             PDDocument singlePageDoc,
             int ticketIndex
     ) throws IOException {
@@ -129,10 +134,11 @@ public class TicketUploadService {
         try {
             TicketVerificationResult verifiedResult = ticketVerificationService.verify(qrCodeData);
             log.info("GetCertify! Certified ticket details for ticket #{} : {}", ticketIndex, verifiedResult);
-            ticket.setCertifiedId(verifiedResult.getId());
+            ticket.setCertifyId(verifiedResult.getId());
+            ticket.setEvent(verifiedResult.getEvent());
 
             // Check if the ticket already exists in the system
-            Optional <Ticket> existingTicket = ticketService.findByCertifiedId(verifiedResult.getId());
+            Optional <Ticket> existingTicket = ticketService.findByCertifyId(verifiedResult.getId());
             if (existingTicket.isPresent()) {
                 log.info("Ticket #{} already existing in the system. .", ticketIndex);
                 String thumbnailUrl = s3Util.generateSignedUrl(existingTicket.get().getThumbnailObjectKey());
@@ -140,9 +146,10 @@ public class TicketUploadService {
                 return existingTicket.get(); // Early return; no need to save again
             }
 
-            // Validate ticket details against certification result
+            // Validate imported ticket details against certified details
             boolean isValid =
-                    Objects.equals(verifiedResult.getPurchaserName(), ticket.getPurchaser().getFullName()) &&
+                    Objects.equals(verifiedResult.getEvent().getId(), selectedEvent.getId()) &&
+                    Objects.equals(verifiedResult.getPurchaserName(), ticket.getPrintedName()) &&
                     Objects.equals(verifiedResult.getSection(), ticket.getSection()) &&
                     Objects.equals(verifiedResult.getRow(), ticket.getRow()) &&
                     Objects.equals(verifiedResult.getSeat(), ticket.getSeat()) &&
@@ -156,7 +163,7 @@ public class TicketUploadService {
 
             // Mark as verified and set event details
             ticket.setStatus(TicketStatus.GC_VERIFIED);
-            ticket.setEvent(verifiedResult.getEvent());
+            ticket.setGetCertifyQrCode(verifiedResult.getGetCertifyQrCode());
 
             String objectKeyPath = String.format("%s/%s/", verifiedResult.getEvent().getId(), verifiedResult.getRefId());
 
@@ -171,7 +178,7 @@ public class TicketUploadService {
             // Save only verified tickets
             String pdfObjectKey = s3Util.savePdfToS3(singlePageDoc, objectKeyPath + verifiedResult.getRefId() + ".pdf");
             ticket.setPdfObjectKey(pdfObjectKey);
-            ticket.setPurchaser(seller);
+            ticket.setPurchaser(user);
             ticketService.saveTicket(ticket);
 
         } catch (GetCertifyException gce) {
@@ -184,7 +191,6 @@ public class TicketUploadService {
             String thumbnailUrl = s3Util.generateSignedUrl(thumbnailKey);
             //TO:DO
             ticket.setThumbnailUrl(thumbnailUrl);
-
             ticket.setStatus(TicketStatus.valueOf(gce.getErrorCode()));
             return ticket;
         }
@@ -195,7 +201,7 @@ public class TicketUploadService {
         PDFRenderer pdfRenderer = new PDFRenderer(document);
         BufferedImage image = pdfRenderer.renderImageWithDPI(0, DPI);
         BufferedImage thumbnail = Thumbnails.of(image)
-                .size(image.getWidth() / 2, image.getHeight() / 2)
+                .size(image.getWidth() / 4, image.getHeight() / 4)
                 .asBufferedImage();
         return s3Util.saveImageToS3(thumbnail, objectKeyPath  + "thumbnail.jpg");
     }
@@ -205,25 +211,25 @@ public class TicketUploadService {
             PDFTextStripper pdfStripper = new PDFTextStripper();
             String text = pdfStripper.getText(document);
 
-            //log.info(text);
+            System.out.println(text);
 
-            String purchaserName = extractFieldValue(text, "Name", "Patron Name", "Patron Full Name");
+            String printedName = extractFieldValue(text, "Name", "Patron Name", "Patron Full Name");
             String category = extractFieldValue(text, "Category");
             String seatNumber =  extractFieldValue(text, "Seat Number", "Seat No.", "Seat");
             String row = extractFieldValue(text, "Row");
             String section = extractFieldValue(text, "Section");
             String entrance = extractFieldValue(text, "Entrance", "Gate");
-            Price originalPrice = parsePrice(extractFieldValue(text, "Price", "Ticket Price"));
+            Optional<Price> originalPrice = Price.from(extractFieldValue(text, "Price", "Ticket Price"));
 
             return Ticket.builder()
-                    .purchaser(User.builder().fullName(purchaserName).build())
+                    .printedName(printedName)
                     .category(category)
                     .seat(seatNumber)
                     .row(row)
                     .section(section)
                     .entrance(entrance)
-                    .price(originalPrice)
-                    .ticketType(StringUtils.isAllBlank(seatNumber, row) ? TicketType.GENERAL_ADMISSION : TicketType.RESERVED_SEATING)
+                    .price(originalPrice.get())
+                    .ticketType(StringUtils.isAllBlank(seatNumber, row) ? TicketType.GA : TicketType.RS)
                     .build();
 
         } catch (IOException e) {
@@ -264,44 +270,5 @@ public class TicketUploadService {
             }
         }
         return null; // Return null if no value found
-    }
-
-    private Price parsePrice(String priceString) {
-        // Null or empty check
-        if (priceString == null || priceString.isEmpty()) {
-            return null;
-        }
-
-        priceString = priceString.trim();
-        double amount = 0.0;
-        String currency = null;
-
-        // Regex to match supported currencies and amount, including symbols like "$"
-        String regex = "(SGD|MYR|USD|\\$)?\\s*([\\d,]+(?:\\.\\d{1,2})?)\\s*(SGD|MYR|USD)?";
-        Matcher matcher = Pattern.compile(regex).matcher(priceString);
-
-        if (matcher.find()) {
-            // Determine the currency: symbol at the start (group 1) or explicit currency code (group 3)
-            if (matcher.group(1) != null) {
-                if (matcher.group(1).equals("$")) {
-                    currency = "SGD"; // Map "$" to "SGD"
-                } else {
-                    currency = matcher.group(1);
-                }
-            } else if (matcher.group(3) != null) {
-                currency = matcher.group(3);
-            }
-
-            // Parse the numeric value
-            String amountStr = matcher.group(2);
-            if (amountStr != null) {
-                amount = Double.parseDouble(amountStr.replace(",", ""));
-            }
-        }
-        // If no amount or currency is found, return null
-        if (amount == 0.0 || currency == null) {
-            return null;
-        }
-        return new Price(amount, currency);
     }
 }

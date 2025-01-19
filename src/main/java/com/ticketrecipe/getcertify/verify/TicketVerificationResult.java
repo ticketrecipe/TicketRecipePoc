@@ -13,9 +13,10 @@ public class TicketVerificationResult {
 
     @JsonIgnore
     private String purchaserEmailAddress;
-
     @JsonIgnore
     private String refId;
+    @JsonIgnore
+    private String getCertifyQrCode;
 
     private Event event;
     private String purchaserName;
@@ -25,5 +26,4 @@ public class TicketVerificationResult {
     private String row;
     private String seat;
     private Price price;
-
 }

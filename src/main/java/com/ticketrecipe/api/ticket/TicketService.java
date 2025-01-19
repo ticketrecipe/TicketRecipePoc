@@ -25,7 +25,7 @@ public class TicketService {
         ticketRepository.deleteById(id);
     }
 
-    public Optional<Ticket> findByCertifiedId(String id) {
-        return ticketRepository.findByCertifiedId(id);
+    public Optional<Ticket> findByCertifyId(String id) {
+        return ticketRepository.findByCertifyId(id);
     }
 }

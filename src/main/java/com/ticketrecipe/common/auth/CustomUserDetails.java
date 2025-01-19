@@ -6,12 +6,12 @@ import java.util.Collection;
 
 public class CustomUserDetails implements UserDetails {
 
-    private final String username;
+    private final String userId;
     private final String email;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public CustomUserDetails(String username, String email, Collection<? extends GrantedAuthority> authorities) {
-        this.username = username;
+        this.userId = username;
         this.email = email;
         this.authorities = authorities;
     }
@@ -32,7 +32,11 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public String getUsername() {
-        return username;
+        return userId;
+    }
+
+    public String getUserId() {
+        return userId;
     }
 
     @Override

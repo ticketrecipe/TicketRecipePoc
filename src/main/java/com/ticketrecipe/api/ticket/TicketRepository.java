@@ -7,9 +7,11 @@ import java.util.Optional;
 
 public interface TicketRepository extends JpaRepository<Ticket, String> {
 
-    Optional<Ticket> findByCertifiedId(String id);
+    Optional<Ticket> findByCertifyId(String id);
 
     List<Ticket> findByPurchaserId(String purchaserId);
 
     List<Ticket> findByPurchaserIdAndEventId(String userId, String eventId);
+
+    List<Ticket> findByPurchaserIdAndEventIdAndIdIn(String purchaserId, String eventId, List<String> ticketIds);
 }

@@ -82,7 +82,7 @@ public class GetCertifyRegistryService {
                             request.getPurchaser().getName(),
                             secretKey
                     );
-                    String qrCodeImage = qrCodeGenerator.generate(referenceId, encryptedPayload);
+                    String getCertifyQrCodeImage = qrCodeGenerator.generate(referenceId, encryptedPayload);
 
                     // Save or update ticket in registry
                     ticketRegistryRepository.save(ticket);
@@ -90,7 +90,7 @@ public class GetCertifyRegistryService {
                     return new TicketRegistryResponse.TicketQRCode(
                             ticketDto.getBarcodeId(),
                             referenceId,
-                            qrCodeImage
+                            getCertifyQrCodeImage
                     );
 
                 } catch (Exception e) {

@@ -1,31 +1,39 @@
 package com.ticketrecipe.api.listing;
 
+import com.ticketrecipe.api.sales.PrivateSale;
+import com.ticketrecipe.api.ticket.TicketRepository;
+import com.ticketrecipe.api.user.UserRepository;
 import com.ticketrecipe.common.Price;
-import com.ticketrecipe.common.ListingInventory;
+import com.ticketrecipe.common.User;
+import com.ticketrecipe.common.listing.InventoryStatus;
+import com.ticketrecipe.common.listing.ListingInventory;
 import com.ticketrecipe.common.Ticket;
 import com.ticketrecipe.common.TicketType;
-import com.ticketrecipe.common.listing.ConfirmListingDto;
 import com.ticketrecipe.getcertify.registry.GetCertifyRegistryService;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import static com.ticketrecipe.api.listing.ListingConfirmation.ListingDetail;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class ListingService {
+
     @Autowired
     private GetCertifyRegistryService gCertifyRegistryService;
     @Autowired
     private ListingRepository listingRepository;
+    @Autowired
+    private TicketRepository ticketRepository;
+    @Autowired
+    private UserRepository userRepository;
 
-    private Listing saveListing (List<Ticket> tickets) {
+    public Listing createListing(List<Ticket> tickets) {
         Ticket firstTicket = tickets.get(0);
         Listing listing = Listing.builder()
                 .event(firstTicket.getEvent())
@@ -41,13 +49,14 @@ public class ListingService {
 
         List<ListingInventory> seats = new ArrayList<ListingInventory>();
         for (Ticket ticket : tickets) {
-            if (TicketType.RESERVED_SEATING.equals(ticket.getTicketType())){
+            if (TicketType.RS.equals(ticket.getTicketType())){
                 seats.add(ListingInventory.builder()
                         .seat(ticket.getSeat())
                         .row(ticket.getRow())
                         .section(ticket.getSection())
                         .listing(listing)
                         .ticket(ticket)
+                        .status(InventoryStatus.AVAILABLE)
                         .build());
             }
         }
@@ -58,8 +67,14 @@ public class ListingService {
     }
 
     @Transactional
-    public List<Listing> createListings (List<Ticket> tickets) {
+    public List<Listing> create(String userId, String eventId, List<String> ticketIds) {
         List<Listing> listings = new ArrayList<>();
+
+        // Fetch tickets owned by the user for the given event and ticket IDs
+        List<Ticket> tickets = ticketRepository.findByPurchaserIdAndEventIdAndIdIn(userId, eventId, ticketIds);
+        if (tickets.isEmpty()) {
+            throw new IllegalArgumentException("No valid tickets found for the provided userId, eventId, and ticketIds.");
+        }
 
         // Sort the tickets by section, row, and seat number
         List<Ticket> sortedTickets = tickets.stream()
@@ -71,7 +86,10 @@ public class ListingService {
                     if (rowCompare != 0) return rowCompare;
 
                     // Comparing seat numbers as integers if possible
-                    return Integer.compare(Integer.parseInt(t1.getSeat()), Integer.parseInt(t2.getSeat()));
+                    return Integer.compare(
+                            Integer.parseInt(t1.getSeat()),
+                            Integer.parseInt(t2.getSeat())
+                    );
                 })
                 .toList();
 
@@ -82,11 +100,10 @@ public class ListingService {
         for (Ticket ticket : sortedTickets) {
             if (previousTicket == null || isConsecutive(previousTicket, ticket)) {
                 currentListing.add(ticket); // Add to the current group if consecutive
-            }
-            else {
-                Listing savedListing = saveListing (currentListing);
-                listings.add(savedListing); // Save the previous group and start a new one
-
+            } else {
+                // Save the previous group as a listing and start a new one
+                Listing savedListing = createListing(currentListing);
+                listings.add(savedListing);
 
                 currentListing = new ArrayList<>();
                 currentListing.add(ticket); // Start a new listing with the current ticket
@@ -96,59 +113,71 @@ public class ListingService {
 
         // Add the last group if it exists
         if (!currentListing.isEmpty()) {
-            Listing savedListing = saveListing (currentListing);
+            Listing savedListing = createListing(currentListing);
             listings.add(savedListing);
         }
         return listings;
     }
 
-    // Retrieve a listing by ID
-    public Optional<Listing> getListingById(String listingId) {
-        return listingRepository.findById(listingId);
-    }
-
-    // Retrieve listings by seller ID
-    public List<Listing> getListingsBySellerId(String sellerId) {
-        return listingRepository.findBySellerId(sellerId);
-    }
-
-    // Retrieve listings by event ID
-    public List<Listing> getListingsByEventId(String eventId) {
-        return listingRepository.findByEventId(eventId);
-    }
-
-    // Delete a listing by ID
-    public void deleteListing(String listingId) {
-        listingRepository.deleteById(listingId);
-    }
-
-    // Helper method to check if two tickets are consecutive
-    private boolean isConsecutive(Ticket previousTicket, Ticket currentTicket) {
-        int previousSeat = Integer.parseInt(previousTicket.getSeat());
-        int currentSeat = Integer.parseInt(currentTicket.getSeat());
-
-        // Check if the current seat is the next one after the previous seat
-        return currentSeat == previousSeat + 1;
-    }
-
     @Transactional
-    public List<Listing> confirmListings(List<ConfirmListingDto> listings) {
-        // Step 1: Retrieve all listings in a single query
-        List<String> listingIds = listings.stream()
-                .map(ConfirmListingDto::listingId)
+    public List<Listing> publish(ListingConfirmation confirmation) {
+        List<String> listingIds = confirmation.getListings().stream()
+                .map(ListingDetail::listingId)
                 .toList();
 
-        List<Listing> fetchedListings = listingRepository.findAllById(listingIds);
+        List<Listing> listings = listingRepository.findAllById(listingIds);
 
-        // Step 2: Validate if any listings are missing
-        if (fetchedListings.size() != listingIds.size()) {
+        // Validate if any listings are missing
+        if (listings.size() != listingIds.size()) {
             throw new IllegalArgumentException("Some listings were not found.");
         }
 
-        // Step 3: Prepare certified tickets in registry to lock in
-        List<String> ticketIds = fetchedListings.stream()
+        ListingStatus status;
+        PrivateSale privateSale = null;
+
+        if (ListingType.PRIVATE.equals(confirmation.getListingType())) {
+            // Check if private buyer is an existing user
+            Optional<User> privateBuyer = userRepository.findByEmailAddress(confirmation.getPrivateBuyerEmail());
+
+            // Set listing status based on private buyer's registration status
+            status = privateBuyer.isPresent() ? ListingStatus.RESERVED : ListingStatus.PENDING;
+
+            // Create private listing object
+            privateSale = PrivateSale.builder()
+                    .privateBuyerEmail(confirmation.getPrivateBuyerEmail())
+                    .privateBuyer(privateBuyer.orElse(null)) // Pass null if buyer isn't registered
+                    .expiresAt(LocalDateTime.now().plusDays(7)) // Example expiration
+                    .build();
+        } else {
+            status = ListingStatus.AVAILABLE;
+        }
+
+        ListingStatus finalStatus = status;
+        PrivateSale finalPrivateSale = privateSale;
+
+        listings.forEach(listing -> {
+            ListingDetail dto = confirmation.getListings().stream()
+                    .filter(l -> l.listingId().equals(listing.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Listing detail not found for listing ID: " + listing.getId()));
+
+            // Update price and status
+            listing.setSellingPrice(dto.sellingPrice());
+            listing.setStatus(finalStatus);
+
+            // Link private listing if applicable
+            if (finalPrivateSale != null) {
+                listing.setType(ListingType.PRIVATE);
+                listing.setPrivateListing(finalPrivateSale);
+            }
+        });
+
+        listings = listingRepository.saveAll(listings);
+
+        // Prepare certified tickets in registry to lock in
+        List<String> ticketIds = listings.stream()
                 .flatMap(listing -> listing.getInventories().stream())
-                .map(inventory -> inventory.getTicket().getCertifiedId())
+                .map(inventory -> inventory.getTicket().getCertifyId())
                 .toList();
 
         // Lock all tickets in a batch
@@ -156,20 +185,14 @@ public class ListingService {
         if (!locked) {
             throw new IllegalStateException("Failed to lock one or more tickets.");
         }
+        return listings;
+    }
 
-        // Step 4: Update all listings and their statuses
-        Map<String, ConfirmListingDto> dtoMap = listings.stream()
-                .collect(Collectors.toMap(ConfirmListingDto::listingId, dto -> dto));
+    private boolean isConsecutive(Ticket previousTicket, Ticket currentTicket) {
+        int previousSeat = Integer.parseInt(previousTicket.getSeat());
+        int currentSeat = Integer.parseInt(currentTicket.getSeat());
 
-        fetchedListings.forEach(listing -> {
-            ConfirmListingDto dto = dtoMap.get(listing.getId().toString());
-
-            // Update price and status
-            listing.setSellingPrice(dto.sellingPrice());
-            listing.setStatus(ListingStatus.ACTIVE);
-        });
-
-        // Step 5: Save all listings in batch
-        return listingRepository.saveAll(fetchedListings);
+        // Check if the current seat is the next one after the previous seat
+        return currentSeat == previousSeat + 1;
     }
 }

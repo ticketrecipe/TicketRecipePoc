@@ -1,17 +1,22 @@
 package com.ticketrecipe.api.listing;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ticketrecipe.api.sales.PrivateSale;
 import com.ticketrecipe.common.*;
-import com.ticketrecipe.common.listing.ListingType;
+import com.ticketrecipe.common.listing.ListingInventory;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Builder
+@Table(name = "listings")
 @Entity
 @Data
 @NoArgsConstructor
@@ -21,8 +26,9 @@ public class Listing {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)
+    @JsonIgnore
     private Event event;
 
     @Enumerated(EnumType.STRING)
@@ -30,6 +36,10 @@ public class Listing {
 
     @Enumerated(EnumType.STRING)
     private ListingType type;
+
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "private_listing_id")
+    private PrivateSale privateListing;
 
     private TicketType ticketType;
 
@@ -47,6 +57,7 @@ public class Listing {
 
     @ManyToOne
     @JoinColumn(name = "seller_id", referencedColumnName = "id")
+    @JsonIgnore
     private User seller;
 
     @Embedded
@@ -65,6 +76,10 @@ public class Listing {
             @AttributeOverride(name = "currency", column = @Column(name = "selling_price_currency"))
     })
     private Price sellingPrice;
+
+    @CreationTimestamp
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
 
     @Transient
     public List<String> getConsecutiveSeats() {
